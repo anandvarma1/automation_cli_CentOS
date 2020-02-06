@@ -1,0 +1,15 @@
+---
+- hosts: all
+  become: yes
+  vars:
+  tasks:
+  - name: Restart server
+    command: /sbin/shutdown -r +1
+    async: 0
+    poll: 0
+    ignore_errors: true
+  - name: Wait 10 mins, but only start checking after 60 seconds
+    wait_for_connection:
+      delay: 60
+      timeout: 600
+
