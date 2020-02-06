@@ -1,0 +1,51 @@
+---
+- hosts: all
+  become: yes
+  vars:
+  tasks:
+   - name: Print some debug information
+     vars:
+       msg: |
+           Ansible Vendor: {{ ansible_system_vendor }}
+           Ansible Model Version: {{ ansible_product_name }}
+     debug:
+        msg: "{{ msg.split('\n') }}"
+#### Coping hponcfg on to HP machines 
+   - name: Copy hponcfg on HP machines
+     copy:
+        src: ../files/hponcfg-4.6.0-0.x86_64.rpm
+        dest: /tmp/hponcfg-4.6.0-0.x86_64.rpm
+        mode: '0755'
+     when: ansible_system_vendor == "HP"
+#### Installing hponcfg on to HP machines
+   - name: Installing hponcfg to control ilo
+     yum:
+        name: /tmp/hponcfg-4.6.0-0.x86_64.rpm
+        state: present
+     when: ansible_system_vendor == "HP"
+#### Install srvadmin for Dell racadm if necessary
+   - name: Installing srvadmin to control idrac
+     yum:
+        name: srvadmin*
+        state: present
+     when: ansible_system_vendor == "Dell Inc."
+
+### Resetting ilo if host is HP
+   - name: Resetting ilo
+     shell: /usr/sbin/hponcfg --reset
+     when: ansible_system_vendor == "HP"
+
+### Resetting idrac if host is Dell
+   - name: Resetting idrac
+     shell: /opt/dell/srvadmin/sbin/racadm racresetcfg
+     when: ansible_system_vendor == "Dell Inc."
+
+### Generating host report in the list which are neither Dell or HP. Example Super micro American Trends or VM hosts
+   - name: Non-ilo/idrac hosts in the list
+     local_action: copy content="{{ inventory_hostname }} ---> {{ ansible_system_vendor}}  {{ ansible_product_name }} \n" dest="{{ inventory_hostname }}.txt"
+     when: ansible_system_vendor != "Dell Inc." and ansible_system_vendor != "HP"
+### Finalizing report
+   - local_action: shell cat *.txt >> output.log
+     ignore_errors: True
+   - file:  state=absent path={{ inventory_hostname }}.txt
+     delegate_to: 127.0.0.1
